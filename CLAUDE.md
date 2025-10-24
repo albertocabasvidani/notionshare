@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+**Repository:** https://github.com/albertocabasvidani/notionshare
+
 ## Project Overview
 
 NotionShare is a web application that enables sharing filtered portions of Notion databases with external users, overcoming Notion's native sharing limitations. It creates mirror databases with row and column filters, bidirectional synchronization, and granular permissions.
