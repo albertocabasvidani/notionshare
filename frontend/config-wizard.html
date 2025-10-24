@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Configuration - NotionShare</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/dashboard.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Create New Configuration</h1>
+            <div class="header-actions">
+                <button onclick="window.location.href='dashboard.html'">Back to Dashboard</button>
+            </div>
+        </header>
+
+        <main>
+            <form id="config-form" class="card">
+                <div class="form-section">
+                    <h3>Basic Information</h3>
+                    <div class="form-group">
+                        <label for="config-name">Configuration Name</label>
+                        <input type="text" id="config-name" required placeholder="e.g., Public Projects">
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h3>Source Database</h3>
+                    <div class="form-group">
+                        <label for="source-database">Select Notion Database</label>
+                        <select id="source-database" required>
+                            <option value="">Loading databases...</option>
+                        </select>
+                    </div>
+                    <button type="button" onclick="loadDatabaseStructure()">Load Properties</button>
+                </div>
+
+                <div class="form-section" id="filters-section" style="display: none;">
+                    <h3>Row Filters</h3>
+                    <p>Only rows matching these filters will be visible in the mirror database</p>
+                    <div id="filters-list"></div>
+                    <button type="button" onclick="addFilter()">Add Filter</button>
+                </div>
+
+                <div class="form-section" id="properties-section" style="display: none;">
+                    <h3>Property Visibility</h3>
+                    <p>Select which properties should be visible and writable</p>
+                    <div id="properties-list"></div>
+                </div>
+
+                <div class="form-section">
+                    <h3>Target Location</h3>
+                    <div class="form-group">
+                        <label for="target-page">Target Page ID</label>
+                        <input type="text" id="target-page" required placeholder="Paste Notion page ID">
+                        <small>The mirror database will be created in this page</small>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h3>Shared Users</h3>
+                    <div id="users-list"></div>
+                    <button type="button" onclick="addUser()">Add User</button>
+                </div>
+
+                <div class="form-section">
+                    <h3>Sync Settings</h3>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="sync-enabled" checked>
+                            Enable automatic sync
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label for="sync-interval">Sync Interval (minutes)</label>
+                        <input type="number" id="sync-interval" value="5" min="1">
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn-primary">Create Configuration</button>
+                    <button type="button" onclick="window.location.href='dashboard.html'">Cancel</button>
+                </div>
+            </form>
+        </main>
+    </div>
+
+    <script src="js/api.js"></script>
+    <script>
+        let databases = [];
+        let selectedDatabase = null;
+        let databaseProperties = [];
+
+        async function init() {
+            try {
+                await loadDatabases();
+            } catch (error) {
+                console.error('Init error:', error);
+                alert('Failed to load: ' + error.message);
+            }
+        }
+
+        async function loadDatabases() {
+            try {
+                databases = await api.getDatabases();
+                const select = document.getElementById('source-database');
+                select.innerHTML = '<option value="">Select a database...</option>';
+                databases.forEach(db => {
+                    const option = document.createElement('option');
+                    option.value = db.id;
+                    option.textContent = db.title || 'Untitled Database';
+                    select.appendChild(option);
+                });
+            } catch (error) {
+                alert('Failed to load databases: ' + error.message);
+            }
+        }
+
+        async function loadDatabaseStructure() {
+            const dbId = document.getElementById('source-database').value;
+            if (!dbId) {
+                alert('Please select a database first');
+                return;
+            }
+
+            try {
+                const structure = await api.getDatabaseStructure(dbId);
+                selectedDatabase = databases.find(db => db.id === dbId);
+                databaseProperties = structure.properties || [];
+                
+                renderPropertiesSection();
+                renderFiltersSection();
+                
+                document.getElementById('filters-section').style.display = 'block';
+                document.getElementById('properties-section').style.display = 'block';
+            } catch (error) {
+                alert('Failed to load database structure: ' + error.message);
+            }
+        }
+
+        function renderPropertiesSection() {
+            const container = document.getElementById('properties-list');
+            container.innerHTML = '';
+            
+            databaseProperties.forEach(prop => {
+                const div = document.createElement('div');
+                div.className = 'property-item';
+                div.innerHTML = `
+                    <label>
+                        <input type="checkbox" class="prop-visible" data-name="${prop.name}" checked>
+                        ${prop.name} (${prop.type})
+                    </label>
+                    <label style="margin-left: 20px;">
+                        <input type="checkbox" class="prop-writable" data-name="${prop.name}">
+                        Writable
+                    </label>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function renderFiltersSection() {
+            document.getElementById('filters-list').innerHTML = '';
+        }
+
+        function addFilter() {
+            const container = document.getElementById('filters-list');
+            const div = document.createElement('div');
+            div.className = 'filter-item';
+            
+            const propertySelect = '<select class="filter-property">' +
+                '<option value="">Select property...</option>' +
+                databaseProperties.map(p => `<option value="${p.name}">${p.name}</option>`).join('') +
+                '</select>';
+            
+            div.innerHTML = `
+                ${propertySelect}
+                <select class="filter-operator">
+                    <option value="equals">Equals</option>
+                    <option value="not_equals">Not Equals</option>
+                    <option value="contains">Contains</option>
+                </select>
+                <input type="text" class="filter-value" placeholder="Value">
+                <button type="button" onclick="this.parentElement.remove()">Remove</button>
+            `;
+            container.appendChild(div);
+        }
+
+        function addUser() {
+            const container = document.getElementById('users-list');
+            const div = document.createElement('div');
+            div.className = 'user-item';
+            div.innerHTML = `
+                <input type="email" class="user-email" placeholder="user@example.com" required>
+                <select class="user-access">
+                    <option value="read">Read Only</option>
+                    <option value="write">Read & Write</option>
+                </select>
+                <button type="button" onclick="this.parentElement.remove()">Remove</button>
+            `;
+            container.appendChild(div);
+        }
+
+        document.getElementById('config-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const dbId = document.getElementById('source-database').value;
+            if (!dbId) {
+                alert('Please select a source database');
+                return;
+            }
+
+            // Collect filters
+            const filters = Array.from(document.querySelectorAll('.filter-item')).map(item => ({
+                filter_type: 'property',
+                property_name: item.querySelector('.filter-property').value,
+                operator: item.querySelector('.filter-operator').value,
+                value: item.querySelector('.filter-value').value
+            })).filter(f => f.property_name);
+
+            // Collect properties
+            const properties = Array.from(document.querySelectorAll('.prop-visible')).map(checkbox => ({
+                property_name: checkbox.dataset.name,
+                is_visible: checkbox.checked,
+                is_writable: document.querySelector(`.prop-writable[data-name="${checkbox.dataset.name}"]`).checked
+            }));
+
+            // Collect users
+            const users = Array.from(document.querySelectorAll('.user-item')).map(item => ({
+                user_email: item.querySelector('.user-email').value,
+                access_level: item.querySelector('.user-access').value
+            })).filter(u => u.user_email);
+
+            const config = {
+                config_name: document.getElementById('config-name').value,
+                source_database_id: dbId,
+                target_page_id: document.getElementById('target-page').value,
+                sync_enabled: document.getElementById('sync-enabled').checked,
+                sync_interval_minutes: parseInt(document.getElementById('sync-interval').value),
+                row_filters: filters,
+                property_mappings: properties,
+                shared_users: users
+            };
+
+            try {
+                await api.createConfig(config);
+                alert('Configuration created successfully!');
+                window.location.href = 'dashboard.html';
+            } catch (error) {
+                alert('Failed to create configuration: ' + error.message);
+            }
+        });
+
+        init();
+    </script>
+
+    <style>
+        .form-section {
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .form-section:last-child {
+            border-bottom: none;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+
+        .form-group input[type="text"],
+        .form-group input[type="email"],
+        .form-group input[type="number"],
+        .form-group select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .form-group small {
+            display: block;
+            margin-top: 5px;
+            color: #666;
+            font-size: 0.85em;
+        }
+
+        .property-item,
+        .filter-item,
+        .user-item {
+            padding: 10px;
+            margin-bottom: 10px;
+            background: #f9f9f9;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .filter-property,
+        .filter-operator {
+            padding: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .filter-value {
+            flex: 1;
+            padding: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .user-email {
+            flex: 1;
+        }
+
+        .form-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 30px;
+        }
+
+        .form-actions button {
+            flex: 1;
+        }
+    </style>
+</body>
+</html>
