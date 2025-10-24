@@ -1,0 +1,77 @@
+.actions-bar {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 30px;
+}
+
+.configs-section {
+    margin-top: 30px;
+}
+
+.configs-section h2 {
+    margin-bottom: 20px;
+    color: #333;
+}
+
+.config-card {
+    background: white;
+    border: 2px solid #eee;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 15px;
+    transition: box-shadow 0.3s;
+}
+
+.config-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.config-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.config-header h3 {
+    color: #333;
+    font-size: 1.3rem;
+}
+
+.status {
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.status.active {
+    background: #d4edda;
+    color: #155724;
+}
+
+.status.inactive {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.config-info {
+    margin-bottom: 15px;
+}
+
+.config-info p {
+    color: #666;
+    margin: 5px 0;
+    font-size: 0.95rem;
+}
+
+.config-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.config-actions button {
+    padding: 8px 16px;
+    font-size: 0.9rem;
+}
