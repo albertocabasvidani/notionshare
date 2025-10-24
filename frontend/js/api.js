@@ -1,4 +1,6 @@
-const API_BASE_URL = 'http://localhost:8000/api/v1';
+// Auto-detect backend URL based on current hostname
+// Works for localhost, Windows host IP (172.x.x.x), or production domain
+const API_BASE_URL = `http://${window.location.hostname}:8000/api/v1`;
 
 class APIClient {
     constructor() {

@@ -104,7 +104,7 @@
 
         async function loadDatabases() {
             try {
-                databases = await api.getDatabases();
+                databases = await api.listDatabases();
                 const select = document.getElementById('source-database');
                 select.innerHTML = '<option value="">Select a database...</option>';
                 databases.forEach(db => {

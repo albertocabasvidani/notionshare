@@ -22,6 +22,8 @@ NotionShare is a web application that enables sharing filtered portions of Notio
 - Celery broker URL format: `db+postgresql://` prefix instead of `postgresql://`
 - Bidirectional sync: source → target (filtered) and target → source (writable properties only)
 - All tables created via SQLAlchemy models with on-the-fly creation at startup
+- Custom CORS middleware for development: FastAPI's built-in CORSMiddleware has issues with wildcard origins, using SimpleCORSMiddleware instead
+- Frontend auto-detects backend API URL from `window.location.hostname` for cross-environment compatibility
 
 ## Database Schema
 
@@ -177,9 +179,27 @@ pip install pydantic[email]
 - Confirm databases are shared with integration in Notion
 - Check token hasn't been revoked
 
+**CORS issues in development:**
+- FastAPI's CORSMiddleware doesn't properly handle `allow_origins=["*"]`
+- Solution: Use custom `SimpleCORSMiddleware` in `app/main.py`
+- The custom middleware manually handles OPTIONS preflight requests and adds CORS headers to all responses
+
 ## Windows-Specific Notes
 
 - Use `venv\Scripts\activate` instead of `source venv/bin/activate`
 - PostgreSQL service: `postgresql-x64-17`
 - Use `python.exe` explicitly for commands when needed
 - Virtual environment executables in `venv\Scripts\` (e.g., `venv\Scripts\alembic.exe`)
+
+## Testing
+
+**Automated Testing:**
+- `test_app.py`: Automated API tests using curl from WSL to Windows
+- Tests registration, login, authentication, and basic endpoints
+- Run: `python test_app.py`
+
+**Playwright Testing (WSL → Windows):**
+- Playwright MCP server runs in WSL
+- Accesses Windows application via host IP (e.g., `172.28.144.1:3000`)
+- Tests full UI flow: registration, login, dashboard navigation
+- Find Windows host IP: `ip route | grep default | awk '{print $3}'`

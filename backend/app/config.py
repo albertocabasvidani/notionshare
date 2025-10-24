@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     # App
     environment: str = "development"
     frontend_url: str
-    cors_origins: str = "http://localhost:3000"
+    cors_origins: str = "*"
 
     @property
     def cors_origins_list(self) -> List[str]:
