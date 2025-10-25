@@ -230,6 +230,61 @@ pip install pydantic[email]
 - Tests full UI flow: registration, login, dashboard navigation, configuration creation, sync
 - Find Windows host IP: `ip route | grep default | awk '{print $3}'`
 
+**Chrome DevTools Testing (WSL → Windows):**
+- Backend runs on Windows, frontend on WSL, browser controlled via Chrome DevTools MCP from WSL
+- Setup requires:
+  1. Backend accessible from WSL (must bind to 0.0.0.0, not 127.0.0.1)
+  2. Frontend configured to use Windows host IP (find with `ip route | grep default | awk '{print $3}'`)
+  3. Chrome DevTools MCP server running in WSL
+
+**Complete Setup Steps:**
+
+1. **Start PostgreSQL on Windows:**
+   ```bash
+   powershell.exe -Command "& 'C:\Program Files\PostgreSQL\17\bin\pg_ctl.exe' start -D 'C:\Program Files\PostgreSQL\17\data' -l 'C:\Program Files\PostgreSQL\17\data\log\logfile.log'"
+   ```
+
+2. **Start Backend on Windows (CRITICAL: use --host 0.0.0.0):**
+   ```bash
+   powershell.exe -Command "cd 'C:\claude-code\Notion permissions\notionshare\backend'; & '.\venv_new\Scripts\python.exe' -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000" &
+   ```
+   Note: `--host 0.0.0.0` is essential for WSL → Windows connectivity
+
+3. **Configure Frontend to Use Windows IP:**
+   - Find Windows IP from WSL: `ip route | grep default | awk '{print $3}'` (typically 172.x.x.x)
+   - Edit `frontend/js/api.js` line 4:
+     ```javascript
+     const API_BASE_URL = `http://172.28.144.1:8000/api/v1`; // Use actual Windows IP
+     ```
+   - Update cache-busting version in `frontend/index.html` line 50:
+     ```html
+     <script src="js/api.js?v=3"></script> <!-- Increment version number -->
+     ```
+
+4. **Start Frontend on WSL:**
+   ```bash
+   cd "/mnt/c/claude-code/Notion permissions/notionshare/frontend" && python3 -m http.server 8081 &
+   ```
+
+5. **Test with Chrome DevTools MCP:**
+   ```
+   mcp__chrome-devtools__new_page → http://localhost:8081/index.html
+   mcp__chrome-devtools__take_snapshot → verify page loaded
+   mcp__chrome-devtools__fill → test registration/login
+   mcp__chrome-devtools__list_network_requests → verify API calls to Windows backend
+   ```
+
+**Network Flow:**
+- Browser (WSL localhost:8081) → Frontend HTML/CSS/JS
+- Frontend JS → Backend API (Windows 172.x.x.x:8000)
+- Backend → PostgreSQL (Windows localhost:5432)
+
+**Troubleshooting:**
+- If API calls fail with ERR_CONNECTION_REFUSED, verify backend is bound to 0.0.0.0
+- If old API URL cached, increment version in index.html and clear browser cache
+- Verify Windows IP hasn't changed: `ip route | grep default | awk '{print $3}'`
+- Check backend is listening: `powershell.exe -Command "netstat -ano | findstr :8000"`
+
 ## Known Issues & Fixes
 
 **Frontend Schema Mismatch (FIXED):**

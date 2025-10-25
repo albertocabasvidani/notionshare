@@ -1,6 +1,7 @@
 // Auto-detect backend URL based on current hostname
 // Works for localhost, Windows host IP (172.x.x.x), or production domain
-const API_BASE_URL = `http://${window.location.hostname}:8000/api/v1`;
+// Temporary override for WSL testing: use Windows host IP
+const API_BASE_URL = `http://172.28.144.1:8000/api/v1`;
 
 class APIClient {
     constructor() {
