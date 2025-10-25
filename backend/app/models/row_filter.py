@@ -18,3 +18,4 @@ class RowFilter(Base):
 
     # Relationships
     config = relationship("DatabaseConfig", back_populates="row_filters")
+    user_permissions = relationship("UserPermission", secondary="user_permission_row_filters", back_populates="row_filters")

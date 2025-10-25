@@ -160,3 +160,44 @@ class NotionService:
             return pages
         except Exception as e:
             raise Exception(f"Failed to search pages: {str(e)}")
+
+    async def create_page_in_parent(self, parent_page_id: str, title: str) -> Dict[str, Any]:
+        """Create a new page as a child of another page"""
+        try:
+            page = await self.client.pages.create(
+                parent={"type": "page_id", "page_id": parent_page_id},
+                properties={
+                    "title": [{"type": "text", "text": {"content": title}}]
+                }
+            )
+            return page
+        except Exception as e:
+            raise Exception(f"Failed to create page in parent: {str(e)}")
+
+    async def share_page_with_user(self, page_id: str, email: str) -> Dict[str, Any]:
+        """Share a page with a user via email"""
+        try:
+            # Add user as a page member with read access
+            # Note: Notion API requires the user to have a Notion account
+            response = await self.client.pages.update(
+                page_id=page_id,
+                properties={}  # No property changes
+            )
+
+            # Share via blocks.children.append with a mention to invite
+            # The proper way is to use the pages endpoint with permissions
+            # However, the notion-client doesn't expose direct permission management
+            # We'll need to use the raw request API
+
+            # For now, we'll use a workaround: create a comment mentioning the user
+            # This will send them a notification
+            from notion_client import Client
+
+            # Note: Actual sharing requires workspace admin permissions
+            # and is done through the UI or enterprise API
+            # For MVP, we'll just log this action
+            print(f"Page {page_id} should be manually shared with {email}")
+
+            return {"status": "pending_manual_share", "email": email, "page_id": page_id}
+        except Exception as e:
+            raise Exception(f"Failed to share page with user: {str(e)}")

@@ -104,7 +104,8 @@
 
         async function loadDatabases() {
             try {
-                databases = await api.listDatabases();
+                const response = await api.listDatabases();
+                databases = response.databases || [];
                 const select = document.getElementById('source-database');
                 select.innerHTML = '<option value="">Select a database...</option>';
                 databases.forEach(db => {
@@ -214,7 +215,7 @@
 
             // Collect filters
             const filters = Array.from(document.querySelectorAll('.filter-item')).map(item => ({
-                filter_type: 'property',
+                filter_type: 'property_match',
                 property_name: item.querySelector('.filter-property').value,
                 operator: item.querySelector('.filter-operator').value,
                 value: item.querySelector('.filter-value').value
@@ -228,10 +229,12 @@
             }));
 
             // Collect users
-            const users = Array.from(document.querySelectorAll('.user-item')).map(item => ({
-                user_email: item.querySelector('.user-email').value,
-                access_level: item.querySelector('.user-access').value
-            })).filter(u => u.user_email);
+            const users = Array.from(document.querySelectorAll('.user-item')).map(item => {
+                return {
+                    user_email: item.querySelector('.user-email').value,
+                    access_level: item.querySelector('.user-access').value
+                };
+            }).filter(u => u.user_email);
 
             const config = {
                 config_name: document.getElementById('config-name').value,
@@ -241,7 +244,7 @@
                 sync_interval_minutes: parseInt(document.getElementById('sync-interval').value),
                 row_filters: filters,
                 property_mappings: properties,
-                shared_users: users
+                user_permissions: users
             };
 
             try {

@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configuration Details - NotionShare</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/dashboard.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Configuration Details</h1>
+            <div class="header-actions">
+                <button onclick="window.location.href='dashboard.html'">Back to Dashboard</button>
+            </div>
+        </header>
+
+        <main>
+            <div id="config-info" class="card">
+                <h2 id="config-name">Loading...</h2>
+                <div id="config-details"></div>
+            </div>
+
+            <div class="card">
+                <h2>Row Filters</h2>
+                <div id="filters-list"></div>
+            </div>
+
+            <div class="card">
+                <h2>Property Mappings</h2>
+                <div id="properties-list"></div>
+            </div>
+
+            <div class="card">
+                <h2>User Permissions</h2>
+                <div id="permissions-list"></div>
+            </div>
+
+            <div class="card">
+                <h2>Sync Logs</h2>
+                <button onclick="refreshLogs()" class="btn-secondary">Refresh</button>
+                <div id="logs-list"></div>
+            </div>
+        </main>
+    </div>
+
+    <script src="js/api.js"></script>
+    <script>
+        let configId = null;
+
+        async function init() {
+            const params = new URLSearchParams(window.location.search);
+            configId = params.get('id');
+
+            if (!configId) {
+                alert('No configuration ID provided');
+                window.location.href = 'dashboard.html';
+                return;
+            }
+
+            await loadConfig();
+            await loadLogs();
+        }
+
+        async function loadConfig() {
+            try {
+                const config = await api.getConfig(configId);
+                displayConfig(config);
+            } catch (error) {
+                alert('Failed to load configuration: ' + error.message);
+                window.location.href = 'dashboard.html';
+            }
+        }
+
+        function displayConfig(config) {
+            document.getElementById('config-name').textContent = config.config_name;
+
+            const detailsEl = document.getElementById('config-details');
+            detailsEl.innerHTML = `
+                <p><strong>Source Database ID:</strong> ${config.source_database_id}</p>
+                <p><strong>Target Database ID:</strong> ${config.target_database_id || 'Not created yet'}</p>
+                <p><strong>Target Parent Page ID:</strong> ${config.target_parent_page_id || 'N/A'}</p>
+                <p><strong>Sync Enabled:</strong> <span class="${config.sync_enabled ? 'status active' : 'status inactive'}">${config.sync_enabled ? 'Yes' : 'No'}</span></p>
+                <p><strong>Sync Interval:</strong> ${config.sync_interval_minutes} minutes</p>
+                <p><strong>Last Sync:</strong> ${config.last_sync_at ? new Date(config.last_sync_at).toLocaleString() : 'Never'}</p>
+                <p><strong>Created:</strong> ${new Date(config.created_at).toLocaleString()}</p>
+            `;
+
+            // Display filters
+            const filtersEl = document.getElementById('filters-list');
+            if (config.row_filters && config.row_filters.length > 0) {
+                filtersEl.innerHTML = config.row_filters.map(filter => `
+                    <div class="list-item">
+                        <p><strong>${filter.property_name}</strong></p>
+                        <p>Operator: ${filter.operator}</p>
+                        <p>Value: ${filter.value}</p>
+                    </div>
+                `).join('');
+            } else {
+                filtersEl.innerHTML = '<p class="empty-state">No row filters defined</p>';
+            }
+
+            // Display property mappings
+            const propertiesEl = document.getElementById('properties-list');
+            if (config.property_mappings && config.property_mappings.length > 0) {
+                propertiesEl.innerHTML = `
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Property Name</th>
+                                <th>Visible</th>
+                                <th>Writable</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${config.property_mappings.map(prop => `
+                                <tr>
+                                    <td>${prop.property_name}</td>
+                                    <td><span class="${prop.is_visible ? 'status active' : 'status inactive'}">${prop.is_visible ? '✓' : '✗'}</span></td>
+                                    <td><span class="${prop.is_writable ? 'status active' : 'status inactive'}">${prop.is_writable ? '✓' : '✗'}</span></td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+            } else {
+                propertiesEl.innerHTML = '<p class="empty-state">No property mappings defined</p>';
+            }
+
+            // Display user permissions
+            const permissionsEl = document.getElementById('permissions-list');
+            if (config.user_permissions && config.user_permissions.length > 0) {
+                permissionsEl.innerHTML = config.user_permissions.map(perm => `
+                    <div class="list-item">
+                        <p><strong>User:</strong> ${perm.external_user_email}</p>
+                        <p><strong>Can View:</strong> ${perm.can_view ? 'Yes' : 'No'}</p>
+                        <p><strong>Can Edit:</strong> ${perm.can_edit ? 'Yes' : 'No'}</p>
+                        <p><strong>Can Delete:</strong> ${perm.can_delete ? 'Yes' : 'No'}</p>
+                    </div>
+                `).join('');
+            } else {
+                permissionsEl.innerHTML = '<p class="empty-state">No user permissions defined</p>';
+            }
+        }
+
+        async function loadLogs() {
+            try {
+                const logs = await api.getSyncLogs(configId, 20);
+                displayLogs(logs);
+            } catch (error) {
+                console.error('Failed to load logs:', error);
+                document.getElementById('logs-list').innerHTML = '<p class="empty-state">Failed to load logs</p>';
+            }
+        }
+
+        function displayLogs(logs) {
+            const logsEl = document.getElementById('logs-list');
+
+            if (logs.length === 0) {
+                logsEl.innerHTML = '<p class="empty-state">No sync logs yet</p>';
+                return;
+            }
+
+            logsEl.innerHTML = `
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>Status</th>
+                            <th>Message</th>
+                            <th>Items Synced</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${logs.map(log => `
+                            <tr>
+                                <td>${new Date(log.sync_started_at).toLocaleString()}</td>
+                                <td><span class="status ${log.status === 'success' ? 'active' : log.status === 'failed' ? 'inactive' : ''}">${log.status}</span></td>
+                                <td>${log.error_message || log.status_message || '-'}</td>
+                                <td>${log.items_synced || 0}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+        }
+
+        async function refreshLogs() {
+            await loadLogs();
+        }
+
+        init();
+    </script>
+</body>
+</html>

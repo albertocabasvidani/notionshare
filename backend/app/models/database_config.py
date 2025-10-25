@@ -10,8 +10,7 @@ class DatabaseConfig(Base):
     id = Column(Integer, primary_key=True, index=True)
     owner_user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     source_database_id = Column(String(255), nullable=False)
-    target_page_id = Column(String(255), nullable=True)
-    target_database_id = Column(String(255), nullable=True)
+    parent_page_id = Column(String(255), nullable=True)  # Parent page where user subpages will be created
     config_name = Column(String(255), nullable=False)
     sync_enabled = Column(Boolean, default=True)
     sync_interval_minutes = Column(Integer, default=15)

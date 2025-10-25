@@ -30,13 +30,23 @@ NotionShare is a web application that enables sharing filtered portions of Notio
 Core relationships:
 - `User` → has many `DatabaseConfig` (ownership)
 - `DatabaseConfig` → has many `RowFilter`, `PropertyMapping`, `UserPermission`, `SyncLog`, `PageMapping`
+- `UserPermission` ↔ `RowFilter`: Many-to-many via `user_permission_row_filters` junction table
 - `PageMapping` tracks source page ↔ target page relationships for sync
 
 Critical fields:
 - `DatabaseConfig.source_database_id`: Original Notion database
-- `DatabaseConfig.target_database_id`: Created mirror database
+- `DatabaseConfig.parent_page_id`: Parent page where user subpages are created
+- `UserPermission.user_page_id`: Dedicated subpage for this guest user
+- `UserPermission.target_database_id`: Mirror database in user's subpage
+- `UserPermission.row_filters`: User-specific row filters (many-to-many)
 - `PropertyMapping.is_visible`: Show in mirror
 - `PropertyMapping.is_writable`: Allow edits from mirror back to source
+
+**Row-Level Permissions Architecture:**
+- Each guest user gets a dedicated subpage under `DatabaseConfig.parent_page_id`
+- Each subpage contains a mirror database with user-specific filtered data
+- Row filters are associated with specific users via many-to-many relationship
+- Sync engine creates/updates per-user databases with user-specific row filters applied
 
 ## Development Commands
 
@@ -115,24 +125,40 @@ celery -A app.tasks.celery_app inspect active
 
 Located in `app/services/sync.py` - `NotionSyncEngine` class:
 
-1. **Mirror Creation** (`_create_mirror_database`):
-   - Creates target database in specified Notion page
-   - Clones only visible properties from source database schema
+**Per-User Architecture:**
+The sync engine creates and maintains separate subpages and mirror databases for each guest user.
 
-2. **Source → Target Sync** (`_sync_source_to_target`):
-   - Queries source database with row filters
+1. **User Subpage Creation** (`_create_user_subpage`):
+   - Creates dedicated subpage for each `UserPermission` under `DatabaseConfig.parent_page_id`
+   - Subpage title: "Shared: {config_name} - {user_email}"
+   - Stores subpage ID in `UserPermission.user_page_id`
+
+2. **User Mirror Database Creation** (`_create_user_mirror_database`):
+   - Creates mirror database within user's dedicated subpage
+   - Clones only visible properties from source database schema (`PropertyMapping.is_visible`)
+   - Stores database ID in `UserPermission.target_database_id`
+
+3. **Source → User Target Sync** (`_sync_source_to_user_target`):
+   - Queries source database with **user-specific row filters** from `UserPermission.row_filters`
    - Filters properties based on `PropertyMapping.is_visible`
-   - Creates/updates pages in target database
-   - Maintains `PageMapping` records
+   - Creates/updates pages in user's mirror database
+   - Maintains `PageMapping` records for each user's database
 
-3. **Target → Source Sync** (`_sync_target_to_source`):
-   - Reads target database pages
+4. **User Target → Source Sync** (`_sync_user_target_to_source`):
+   - Reads pages from user's mirror database
    - Updates only `is_writable=True` properties back to source
+   - Only runs if `UserPermission.access_level == "write"`
    - Uses `PageMapping` to match pages
 
-4. **Scheduled Sync**:
+5. **Page Sharing** (`_ensure_page_shared`):
+   - Shares user's subpage with their email via Notion API
+   - Marks `UserPermission.notified = True` when shared
+   - Note: Current implementation logs sharing intent (Notion API sharing requires workspace permissions)
+
+6. **Scheduled Sync**:
    - Celery Beat runs every 5 minutes (configurable in `celery_app.py`)
    - Syncs all configs with `sync_enabled=True`
+   - Processes all `UserPermission` records for each config
 
 ## API Structure
 
@@ -201,5 +227,18 @@ pip install pydantic[email]
 **Playwright Testing (WSL → Windows):**
 - Playwright MCP server runs in WSL
 - Accesses Windows application via host IP (e.g., `172.28.144.1:3000`)
-- Tests full UI flow: registration, login, dashboard navigation
+- Tests full UI flow: registration, login, dashboard navigation, configuration creation, sync
 - Find Windows host IP: `ip route | grep default | awk '{print $3}'`
+
+## Known Issues & Fixes
+
+**Frontend Schema Mismatch (FIXED):**
+- `config-wizard.html` was sending `filter_type: 'property'` but backend expects `'property_match'`
+- Fixed in config-wizard.html:218
+- `config-detail.html` was using wrong field names: `source_property_name` instead of `property_name`, `filter_condition`/`filter_value` instead of `operator`/`value`
+- Fixed in config-detail.html:119, 96-97
+
+**Row Filter Behavior:**
+- Row filters use Notion API query filters: https://developers.notion.com/reference/post-database-query-filter
+- If no rows match the filter, ALL rows are synced (Notion API returns all results when filter matches nothing)
+- Property filters work correctly: only `is_visible=True` properties are included in mirror database

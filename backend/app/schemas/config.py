@@ -51,6 +51,7 @@ class RowFilterResponse(BaseModel):
 class UserPermissionCreate(BaseModel):
     user_email: str
     access_level: str = "read"  # 'read', 'write'
+    row_filter_ids: List[int] = []  # IDs of RowFilters specific to this user
 
 
 class UserPermissionResponse(BaseModel):
@@ -58,8 +59,11 @@ class UserPermissionResponse(BaseModel):
     config_id: int
     user_email: str
     access_level: str
+    user_page_id: Optional[str]
+    target_database_id: Optional[str]
     notified: bool
     created_at: datetime
+    row_filters: List[RowFilterResponse] = []
 
     class Config:
         from_attributes = True
@@ -68,7 +72,7 @@ class UserPermissionResponse(BaseModel):
 # DatabaseConfig schemas
 class DatabaseConfigCreate(BaseModel):
     source_database_id: str
-    target_page_id: str
+    parent_page_id: str
     config_name: str
     sync_enabled: bool = True
     sync_interval_minutes: int = 15
@@ -81,15 +85,14 @@ class DatabaseConfigUpdate(BaseModel):
     config_name: Optional[str] = None
     sync_enabled: Optional[bool] = None
     sync_interval_minutes: Optional[int] = None
-    target_page_id: Optional[str] = None
+    parent_page_id: Optional[str] = None
 
 
 class DatabaseConfigResponse(BaseModel):
     id: int
     owner_user_id: int
     source_database_id: str
-    target_page_id: Optional[str]
-    target_database_id: Optional[str]
+    parent_page_id: Optional[str]
     config_name: str
     sync_enabled: bool
     sync_interval_minutes: int

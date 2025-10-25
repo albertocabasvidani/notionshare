@@ -43,7 +43,7 @@ def create_config(
     new_config = DatabaseConfig(
         owner_user_id=current_user.id,
         source_database_id=config_data.source_database_id,
-        target_page_id=config_data.target_page_id,
+        parent_page_id=config_data.parent_page_id,
         config_name=config_data.config_name,
         sync_enabled=config_data.sync_enabled,
         sync_interval_minutes=config_data.sync_interval_minutes
@@ -61,20 +61,30 @@ def create_config(
         db.add(pm)
 
     # Add row filters
+    row_filter_map = {}
     for rf_data in config_data.row_filters:
         rf = RowFilter(
             config_id=new_config.id,
             **rf_data.model_dump()
         )
         db.add(rf)
+        db.flush()
+        row_filter_map[len(row_filter_map)] = rf  # Store for later reference
 
-    # Add user permissions
+    # Add user permissions with row filters
     for up_data in config_data.user_permissions:
+        up_dict = up_data.model_dump(exclude={'row_filter_ids'})
         up = UserPermission(
             config_id=new_config.id,
-            **up_data.model_dump()
+            **up_dict
         )
         db.add(up)
+        db.flush()
+
+        # Associate row filters with this user permission
+        for rf_id in up_data.row_filter_ids:
+            if rf_id < len(row_filter_map):
+                up.row_filters.append(row_filter_map[rf_id])
 
     db.commit()
     db.refresh(new_config)
